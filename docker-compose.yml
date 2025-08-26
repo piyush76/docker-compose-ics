@@ -1,0 +1,91 @@
+services:
+  ics-service:
+    image: incora.azurecr.io/ics-service:d22e942
+    container_name: ics-service
+    ports:
+      - "9090:9090"  # Application port
+      - "9091:9091"  # Management/Actuator port
+    environment:
+      # Database configuration
+      - DB_URL=jdbc:oracle:thin:@oracle-db:1521:ORCL
+      - DB_PASSWORD=${TCMIS_DB_SECRET:-defaultpassword}
+      # Spring configuration from ics-service-config ConfigMap
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_DATASOURCE_URL=jdbc:oracle:thin:@oracle-db:1521:ORCL
+      - SPRING_DATASOURCE_USERNAME=tcm_ops
+      - SPRING_DATASOURCE_PASSWORD=${TCMIS_DB_SECRET:-defaultpassword}
+      - SPRING_DATASOURCE_DRIVER_CLASS_NAME=oracle.jdbc.OracleDriver
+      # Azure AD configuration (from original application.yml)
+      - SPRING_CLOUD_AZURE_ACTIVE_DIRECTORY_ENABLED=true
+      - SPRING_CLOUD_AZURE_ACTIVE_DIRECTORY_CREDENTIAL_CLIENT_ID=a390d735-8347-4ef1-8a65-875d1410e88c
+      - SPRING_CLOUD_AZURE_ACTIVE_DIRECTORY_APP_ID_URI=api://a390d735-8347-4ef1-8a65-875d1410e88c
+      # Server configuration
+      - SERVER_PORT=9090
+      - SERVER_SERVLET_CONTEXT_PATH=/chemicals/api
+      - MANAGEMENT_SERVER_PORT=9091
+      - MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=*
+      - MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always
+      - MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED=true
+    volumes:
+      # Volume mounts equivalent to K8s PersistentVolumeClaims
+      - ics-service-msds:/msds
+      - ics-service-receiptimages:/receiptimages
+      - ics-service-docimages:/docimages
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9091/actuator/health/liveness"]
+      interval: 5s
+      timeout: 1s
+      retries: 3
+      start_period: 45s
+    depends_on:
+      oracle-db:
+        condition: service_healthy
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    networks:
+      - ics-network
+
+  oracle-db:
+    image: container-registry.oracle.com/database/express:21.3.0-xe
+    container_name: oracle-db
+    environment:
+      - ORACLE_PWD=${ORACLE_ROOT_PASSWORD:-OraclePassword123}
+      - ORACLE_CHARACTERSET=AL32UTF8
+    ports:
+      - "1521:1521"
+      - "5500:5500"  # Oracle Enterprise Manager
+    volumes:
+      - oracle-data:/opt/oracle/oradata
+      - oracle-backup:/opt/oracle/backup
+      # Initialize database with required user and schema
+      - ./init-scripts:/opt/oracle/scripts/startup
+    healthcheck:
+      test: ["CMD", "sqlplus", "-L", "sys/$$ORACLE_PWD@//localhost:1521/XE", "as", "sysdba", "<<<", "SELECT 1 FROM DUAL;"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+    restart: unless-stopped
+    networks:
+      - ics-network
+
+volumes:
+  # Named volumes for persistent data storage
+  ics-service-msds:
+    driver: local
+  ics-service-receiptimages:
+    driver: local
+  ics-service-docimages:
+    driver: local
+  oracle-data:
+    driver: local
+  oracle-backup:
+    driver: local
+
+networks:
+  ics-network:
+    driver: bridge
+    name: ics-network
