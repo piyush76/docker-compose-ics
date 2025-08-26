@@ -1,11 +1,13 @@
 #!/bin/bash
 set -e
 
-
 OPERATION="${1:-deploy}"
 COMPOSE_PATH="${2:-/opt/ics-service}"
 ENV_FILE_PATH="${3:-/opt/ics-service/.env}"
 TIMEOUT="${4:-300}"
+ENVIRONMENT="${5:-dev}"
+
+echo "Environment: $ENVIRONMENT"
 
 echo "Starting docker-compose operation: $OPERATION"
 echo "Compose path: $COMPOSE_PATH"

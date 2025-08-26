@@ -33,6 +33,10 @@ pipeline:
                           sudo chown <+pipeline.variables.ssh_user>:<+pipeline.variables.ssh_user> <+pipeline.variables.deployment_path>
 
                           cd <+pipeline.variables.deployment_path>
+                          
+                          echo "Copying environment-specific docker-compose configuration..."
+                          cp environments/<+pipeline.variables.environment>/docker-compose.yml .
+                          cp environments/<+pipeline.variables.environment>/.env.example .env
 
                           cat > .env << EOF
                           TCMIS_DB_SECRET=<+secrets.getValue("TCMIS_DB_SECRET")>

@@ -19,6 +19,9 @@ inputSet:
       - name: image_tag
         type: String
         value: latest
+      - name: deployment_path
+        type: String
+        value: /opt/ics-service/environments/dev
     properties:
       ci:
         codebase:
