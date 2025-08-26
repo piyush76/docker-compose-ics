@@ -93,9 +93,10 @@ Both environments are compatible with:
 - **Development**: `ics-service-dev` on ports 9090/9091
 - **Production**: `ics-service-prod` on ports 9090/9091
 
-### Oracle Database
-- **Development**: `oracle-db-dev` on ports 1521/5500
-- **Production**: `oracle-db-prod` on ports 1521/5500
+### External Oracle Database
+- **Host**: `infdev-ora01a.tcmis.com:1521`
+- **Service**: `ICSDEV`
+- **Connection**: Shared external database for both environments
 
 ## Environment Variables
 

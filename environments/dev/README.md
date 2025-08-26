@@ -49,11 +49,11 @@ podman-compose ps
 - **Image**: `incora.azurecr.io/ics-service:latest`
 - **Profile**: `dev`
 
-### Oracle Database (Development)
-- **Container**: `oracle-db-dev`
-- **Ports**: 1521 (database), 5500 (EM)
-- **Image**: `container-registry.oracle.com/database/express:21.3.0-xe`
-- **Default Password**: `DevOraclePassword123`
+### External Oracle Database
+- **Host**: `infdev-ora01a.tcmis.com`
+- **Port**: 1521
+- **Service**: `ICSDEV`
+- **Connection**: External database managed separately
 
 ## Development Workflow
 
@@ -80,8 +80,8 @@ curl http://localhost:9091/actuator/health/readiness
 # Application endpoints
 curl http://localhost:9090/chemicals/api/actuator/info
 
-# Database connection test
-docker-compose exec oracle-db-dev sqlplus tcm_ops/devpassword123@XE
+# External database connection test (if you have access)
+# sqlplus tcm_ops/devpassword123@//infdev-ora01a.tcmis.com:1521/ICSDEV
 ```
 
 ### Cleanup:
@@ -96,17 +96,16 @@ docker-compose down -v
 ## Troubleshooting
 
 ### Common Issues:
-1. **Port conflicts**: Ensure ports 9090, 9091, 1521, 5500 are available
-2. **Database startup**: Oracle may take 2-3 minutes to fully initialize
-3. **Memory**: Ensure sufficient memory for Oracle (minimum 2GB recommended)
+1. **Port conflicts**: Ensure ports 9090, 9091 are available
+2. **Database connectivity**: Verify network access to infdev-ora01a.tcmis.com:1521
+3. **Database credentials**: Ensure TCMIS_DB_SECRET is correctly configured
 
 ### Logs:
 ```bash
 # Application logs
 docker-compose logs ics-service
 
-# Database logs
-docker-compose logs oracle-db-dev
+# Database connectivity (check application logs for database errors)
 
 # All logs
 docker-compose logs

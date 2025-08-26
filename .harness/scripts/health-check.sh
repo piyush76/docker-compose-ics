@@ -32,23 +32,26 @@ check_http_endpoint() {
     return 1
 }
 
-check_oracle_database() {
+check_external_database_connectivity() {
     local retry_count=0
     
+    echo "🔍 Checking external Oracle database connectivity through application health..."
+    
     while [ $retry_count -lt $MAX_RETRIES ]; do
-        echo "Checking Oracle database health (attempt $((retry_count + 1))/$MAX_RETRIES)"
+        echo "Checking external database connectivity (attempt $((retry_count + 1))/$MAX_RETRIES)"
         
-        if docker-compose exec -T oracle-db sqlplus -L sys/\$ORACLE_PWD@//localhost:1521/XE as sysdba <<< "SELECT 1 FROM DUAL;" > /dev/null 2>&1; then
-            echo "✅ Oracle database is healthy"
+        if curl -f -s "http://$TARGET_HOST:9091/actuator/health" | grep -q '"status":"UP"'; then
+            echo "✅ External Oracle database connectivity verified through application"
             return 0
         fi
         
-        echo "❌ Oracle database health check failed, retrying in $RETRY_INTERVAL seconds..."
+        echo "❌ External database connectivity check failed, retrying in $RETRY_INTERVAL seconds..."
         sleep $RETRY_INTERVAL
         retry_count=$((retry_count + 1))
     done
     
-    echo "🚨 Oracle database health check failed after $MAX_RETRIES attempts"
+    echo "🚨 External database connectivity check failed after $MAX_RETRIES attempts"
+    echo "💡 Note: External database at infdev-ora01a.tcmis.com:1521/ICSDEV may be unreachable"
     return 1
 }
 
@@ -57,7 +60,7 @@ check_all_services() {
     
     echo "🔍 Checking all services health..."
     
-    if ! check_oracle_database; then
+    if ! check_external_database_connectivity; then
         all_healthy=false
     fi
     
@@ -84,7 +87,7 @@ check_all_services() {
 
 case "$SERVICE_NAME" in
     "oracle"|"database"|"db")
-        check_oracle_database
+        check_external_database_connectivity
         ;;
     "ics-service"|"app"|"application")
         check_http_endpoint "http://$TARGET_HOST:9091/actuator/health/liveness" "ics-service-liveness" &&

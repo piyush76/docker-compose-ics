@@ -9,115 +9,9 @@ pipeline:
     service: ics-service
   stages:
     - stage:
-        name: Database Deployment
-        identifier: database_deployment
-        description: Deploy Oracle Database for ICS Service
-        type: CustomStage
-        spec:
-          execution:
-            steps:
-              - step:
-                  type: ShellScript
-                  name: Prepare Database Environment
-                  identifier: prepare_database_environment
-                  spec:
-                    shell: Bash
-                    onDelegate: true
-                    source:
-                      type: Inline
-                      spec:
-                        script: |
-                          echo "Preparing database deployment environment..."
-
-                          sudo mkdir -p <+pipeline.variables.deployment_path>
-                          sudo chown <+pipeline.variables.ssh_user>:<+pipeline.variables.ssh_user> <+pipeline.variables.deployment_path>
-
-                          cd <+pipeline.variables.deployment_path>
-                          
-                          echo "Copying environment-specific docker-compose configuration..."
-                          cp environments/<+pipeline.variables.environment>/docker-compose.yml .
-                          cp environments/<+pipeline.variables.environment>/.env.example .env
-
-                          cat > .env << EOF
-                          TCMIS_DB_SECRET=<+secrets.getValue("TCMIS_DB_SECRET")>
-                          ORACLE_ROOT_PASSWORD=<+secrets.getValue("ORACLE_ROOT_PASSWORD")>
-                          EOF
-
-                          echo "Database environment prepared successfully"
-                    environmentVariables: []
-                    outputVariables: []
-                  timeout: 5m
-                  failureStrategies:
-                    - onFailure:
-                        errors:
-                          - AllErrors
-                        action:
-                          type: MarkAsFailure
-              - step:
-                  type: CustomDeployment
-                  name: Deploy Oracle Database
-                  identifier: deploy_oracle_database
-                  spec:
-                    customDeploymentRef:
-                      templateRef: docker_compose_deployment_template
-                      versionLabel: v1.0.0
-                    infrastructure:
-                      variables:
-                        target_host: <+pipeline.variables.target_host>
-                        docker_compose_path: <+pipeline.variables.deployment_path>
-                        env_file_path: <+pipeline.variables.deployment_path>/.env
-                        ssh_user: <+pipeline.variables.ssh_user>
-                    execution:
-                      steps:
-                        - step:
-                            type: ShellScript
-                            name: Deploy Database Service
-                            identifier: deploy_database_service
-                            spec:
-                              shell: Bash
-                              onDelegate: true
-                              source:
-                                type: Inline
-                                spec:
-                                  script: |
-                                    echo "Starting Oracle database deployment..."
-                                    cd <+pipeline.variables.deployment_path>
-
-                                    docker-compose up -d oracle-db
-
-                                    echo "Waiting for database to be ready..."
-                                    sleep 60
-
-                                    bash <+pipeline.variables.deployment_path>/.harness/scripts/health-check.sh oracle
-                              environmentVariables: []
-                              outputVariables: []
-                            timeout: 10m
-                            failureStrategies:
-                              - onFailure:
-                                  errors:
-                                    - AllErrors
-                                  action:
-                                    type: Retry
-                                    spec:
-                                      retryCount: 2
-                                      retryIntervals:
-                                        - 2m
-                              - onFailure:
-                                  errors:
-                                    - AllErrors
-                                  action:
-                                    type: MarkAsFailure
-        tags: {}
-        failureStrategies:
-          - onFailure:
-              errors:
-                - AllErrors
-              action:
-                type: StageRollback
-    - stage:
-        name: Application Deployment
-        identifier: application_deployment
-        description: Deploy ICS Service Application
+        name: ICS Service Deployment
+        identifier: ics_service_deployment
+        description: Deploy ICS Service Application (External Database)
         type: CustomStage
         spec:
           execution:
@@ -149,15 +43,27 @@ pipeline:
                                 type: Inline
                                 spec:
                                   script: |
-                                    echo "Starting ICS service deployment..."
+                                    echo "Preparing deployment environment..."
+                                    sudo mkdir -p <+pipeline.variables.deployment_path>
+                                    sudo chown <+pipeline.variables.ssh_user>:<+pipeline.variables.ssh_user> <+pipeline.variables.deployment_path>
                                     cd <+pipeline.variables.deployment_path>
+                                    
+                                    echo "Copying environment-specific configuration..."
+                                    cp environments/<+pipeline.variables.environment>/docker-compose.yml .
+                                    cp environments/<+pipeline.variables.environment>/.env.example .env
+                                    
+                                    echo "Setting up environment variables..."
+                                    cat >> .env << EOF
+                                    TCMIS_DB_SECRET=<+secrets.getValue("TCMIS_DB_SECRET")>
+                                    EOF
 
+                                    echo "Starting ICS service deployment..."
                                     docker-compose up -d ics-service
 
                                     echo "Waiting for application to be ready..."
                                     sleep 45
 
-                                    bash <+pipeline.variables.deployment_path>/.harness/scripts/health-check.sh all
+                                    bash <+pipeline.variables.deployment_path>/.harness/scripts/health-check.sh ics-service
                               environmentVariables: []
                               outputVariables: []
                             timeout: 15m
@@ -207,9 +113,6 @@ pipeline:
                 - AllErrors
               action:
                 type: StageRollback
-        when:
-          pipelineStatus: Success
-          condition: <+pipeline.stages.database_deployment.status> == "SUCCESS"
   variables:
     - name: target_host
       type: String

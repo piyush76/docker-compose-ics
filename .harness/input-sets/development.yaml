@@ -21,7 +21,7 @@ inputSet:
         value: latest
       - name: deployment_path
         type: String
-        value: /opt/ics-service/environments/dev
+        value: /opt/ics-service
     properties:
       ci:
         codebase:

@@ -7,12 +7,12 @@ services:
       - "9090:9090"  # Application port
       - "9091:9091"  # Management/Actuator port
     environment:
-      # Database configuration
-      - DB_URL=jdbc:oracle:thin:@oracle-db-dev:1521:ORCL
+      # Database configuration - External Oracle Database
+      - DB_URL=jdbc:oracle:thin:@//infdev-ora01a.tcmis.com:1521/ICSDEV
       - DB_PASSWORD=${TCMIS_DB_SECRET:-devpassword}
       # Spring configuration
       - SPRING_PROFILES_ACTIVE=dev
-      - SPRING_DATASOURCE_URL=jdbc:oracle:thin:@oracle-db-dev:1521:ORCL
+      - SPRING_DATASOURCE_URL=jdbc:oracle:thin:@//infdev-ora01a.tcmis.com:1521/ICSDEV
       - SPRING_DATASOURCE_USERNAME=tcm_ops
       - SPRING_DATASOURCE_PASSWORD=${TCMIS_DB_SECRET:-devpassword}
       - SPRING_DATASOURCE_DRIVER_CLASS_NAME=oracle.jdbc.OracleDriver
@@ -42,40 +42,12 @@ services:
       timeout: 1s
       retries: 3
       start_period: 45s
-    depends_on:
-      oracle-db-dev:
-        condition: service_healthy
+    # No local database dependency - using external Oracle database
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
     cap_drop:
       - ALL
-    networks:
-      - ics-network-dev
-
-  oracle-db-dev:
-    image: container-registry.oracle.com/database/express:21.3.0-xe
-    container_name: oracle-db-dev
-    environment:
-      - ORACLE_PWD=${ORACLE_ROOT_PASSWORD:-DevOraclePassword123}
-      - ORACLE_CHARACTERSET=AL32UTF8
-    ports:
-      - "1521:1521"
-      - "5500:5500"  # Oracle Enterprise Manager
-    volumes:
-      - oracle-data-dev:/opt/oracle/oradata
-      - oracle-backup-dev:/opt/oracle/backup
-      # Initialize database with required user and schema
-      - ../../init-scripts:/opt/oracle/scripts/startup
-    healthcheck:
-      test: ["CMD", "sqlplus", "-L",
-             "sys/$$ORACLE_PWD@//localhost:1521/XE", "as", "sysdba",
-             "<<<", "SELECT 1 FROM DUAL;"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 120s
-    restart: unless-stopped
     networks:
       - ics-network-dev
 
@@ -86,10 +58,6 @@ volumes:
   ics-service-receiptimages-dev:
     driver: local
   ics-service-docimages-dev:
-    driver: local
-  oracle-data-dev:
-    driver: local
-  oracle-backup-dev:
     driver: local
 
 networks:
