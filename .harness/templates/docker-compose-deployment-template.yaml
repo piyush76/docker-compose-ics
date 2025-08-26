@@ -1,0 +1,99 @@
+---
+template:
+  name: Docker Compose Deployment Template
+  identifier: docker_compose_deployment_template
+  versionLabel: v1.0.0
+  type: CustomDeployment
+  projectIdentifier: ics_service_project
+  orgIdentifier: default
+  tags: {}
+  spec:
+    infrastructure:
+      variables:
+        - name: target_host
+          type: String
+          description: Target host for deployment
+          required: true
+        - name: docker_compose_path
+          type: String
+          description: Path to docker-compose.yml on target host
+          required: true
+          value: /opt/ics-service
+        - name: env_file_path
+          type: String
+          description: Path to .env file on target host
+          required: true
+          value: /opt/ics-service/.env
+        - name: ssh_user
+          type: String
+          description: SSH user for target host
+          required: true
+          value: ubuntu
+    fetchInstancesScript:
+      store:
+        type: Inline
+        spec:
+          script: |
+            #!/bin/bash
+            set -e
+
+            cd <+infra.variables.docker_compose_path>
+
+            services=$(docker-compose ps --format json 2>/dev/null || echo "[]")
+
+            if [ "$services" = "[]" ] || [ -z "$services" ]; then
+              echo "[]"
+              exit 0
+            fi
+
+            echo "$services" | jq -r '
+              if type == "array" then
+                map({
+                  "instanceName": .Name,
+                  "host": {
+                    "hostName": "<+infra.variables.target_host>",
+                    "ip": "<+infra.variables.target_host>"
+                  },
+                  "properties": {
+                    "serviceName": .Service,
+                    "state": .State,
+                    "ports": .Ports,
+                    "image": .Image
+                  }
+                })
+              else
+                [{
+                  "instanceName": .Name,
+                  "host": {
+                    "hostName": "<+infra.variables.target_host>",
+                    "ip": "<+infra.variables.target_host>"
+                  },
+                  "properties": {
+                    "serviceName": .Service,
+                    "state": .State,
+                    "ports": .Ports,
+                    "image": .Image
+                  }
+                }]
+              end'
+    instanceAttributes:
+      - name: instanceName
+        jsonPath: instanceName
+        description: Docker container instance name
+      - name: host
+        jsonPath: host
+        description: Target host information
+      - name: serviceName
+        jsonPath: properties.serviceName
+        description: Docker Compose service name
+      - name: state
+        jsonPath: properties.state
+        description: Container state
+      - name: ports
+        jsonPath: properties.ports
+        description: Container port mappings
+      - name: image
+        jsonPath: properties.image
+        description: Container image
+    instancesListPath: instances
+    deploymentTypeTemplateVersion: "1.0"

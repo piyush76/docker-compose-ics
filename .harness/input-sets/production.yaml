@@ -1,0 +1,40 @@
+---
+
+inputSet:
+  name: Production Environment Input Set
+  identifier: production_environment_input_set
+  projectIdentifier: ics_service_project
+  orgIdentifier: default
+  tags:
+    environment: production
+  pipeline:
+    identifier: ics_service_deployment_pipeline
+    variables:
+      - name: target_host
+        type: String
+        value: prod-ics-host.example.com
+      - name: environment
+        type: String
+        value: production
+      - name: image_tag
+        type: String
+        value: stable
+    properties:
+      ci:
+        codebase:
+          connectorRef: github_connector
+          repoName: docker-compose-ics
+          build: <+input>
+    notificationRules:
+      - name: Deployment Success Notification
+        identifier: deployment_success_notification
+        notificationMethod:
+          type: Slack
+          spec:
+            webhookUrl: https://hooks.slack.com/services/YOUR/PROD/WEBHOOK
+      - name: Deployment Failure Notification
+        identifier: deployment_failure_notification
+        notificationMethod:
+          type: Slack
+          spec:
+            webhookUrl: https://hooks.slack.com/services/YOUR/PROD/WEBHOOK
