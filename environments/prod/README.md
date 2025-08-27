@@ -92,6 +92,9 @@ curl https://your-domain.com:9091/actuator/health
 
 ### Starting Production Environment:
 ```bash
+# Login to Azure Container Registry first
+./docker-login.sh
+
 # Start all services
 docker-compose up -d
 

@@ -37,35 +37,42 @@ check_service_health() {
     return 1
 }
 
-wait_for_database() {
-    echo "Waiting for Oracle database to be ready..."
-    local max_attempts=30
+check_external_database_connectivity() {
+    echo "Checking external Oracle database connectivity through application..."
+    local max_attempts=10
     local attempt=1
     
     while [ $attempt -le $max_attempts ]; do
-        if docker-compose exec -T oracle-db sqlplus -L sys/\$ORACLE_PWD@//localhost:1521/XE as sysdba <<< "SELECT 1 FROM DUAL;" > /dev/null 2>&1; then
-            echo "Oracle database is ready"
+        if curl -f -s "http://localhost:9091/actuator/health" | grep -q '"status":"UP"'; then
+            echo "External Oracle database connectivity verified"
             return 0
         fi
-        echo "Attempt $attempt/$max_attempts: Database not ready yet..."
-        sleep 10
+        echo "Attempt $attempt/$max_attempts: Checking database connectivity..."
+        sleep 15
         attempt=$((attempt + 1))
     done
     
-    echo "ERROR: Database failed to become ready after $max_attempts attempts"
+    echo "WARNING: Could not verify external database connectivity"
     return 1
 }
 
 deploy_services() {
     echo "Starting deployment of docker-compose services..."
     
+    echo "Copying environment-specific configuration..."
+    cp environments/${ENVIRONMENT}/docker-compose.yml .
+    cp environments/${ENVIRONMENT}/.env.example .env
+    cp environments/${ENVIRONMENT}/docker-login.sh .
+    
+    echo "Logging into Azure Container Registry..."
+    chmod +x docker-login.sh
+    ./docker-login.sh
+    
     echo "Pulling latest images..."
     docker-compose pull
     
     echo "Starting services..."
     docker-compose up -d
-    
-    wait_for_database
     
     echo "Waiting for ics-service to be ready..."
     sleep 45  # Initial delay for service startup

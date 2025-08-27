@@ -3,6 +3,8 @@ services:
   ics-service:
     image: incora.azurecr.io/ics-service:latest
     container_name: ics-service-dev
+    # Azure Container Registry authentication
+    pull_policy: always
     ports:
       - "9090:9090"  # Application port
       - "9091:9091"  # Management/Actuator port

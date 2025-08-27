@@ -59,12 +59,14 @@ podman-compose ps
 
 ### Starting Development Environment:
 ```bash
+# Login to Azure Container Registry first
+./docker-login.sh
+
 # Start all services
 docker-compose up -d
 
 # View logs
 docker-compose logs -f ics-service
-docker-compose logs -f oracle-db-dev
 
 # Access application
 curl http://localhost:9090/chemicals/api/actuator/health
