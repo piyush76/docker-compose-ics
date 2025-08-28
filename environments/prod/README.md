@@ -1,6 +1,6 @@
 # Production Environment
 
-This directory contains the production environment configuration for the ICS Service.
+This directory contains the production environment configuration for the ICS Service with integrated monitoring stack.
 
 ## ⚠️ Production Deployment
 
@@ -16,7 +16,10 @@ cd environments/prod
 cp .env.example .env
 # IMPORTANT: Edit .env with secure production values
 
-# Start services
+# Login to Azure Container Registry
+./docker-login.sh
+
+# Start services (including monitoring stack)
 docker-compose up -d
 # OR with podman
 podman-compose up -d
@@ -24,6 +27,11 @@ podman-compose up -d
 # Verify deployment
 docker-compose ps
 curl https://your-domain.com:9091/actuator/health
+
+# Access monitoring services
+# Grafana: https://your-domain.com:3000 (admin/your-secure-password)
+# Prometheus: https://your-domain.com:9092
+# Loki: https://your-domain.com:3100
 ```
 
 ## Production Features
@@ -56,11 +64,21 @@ curl https://your-domain.com:9091/actuator/health
 - **Profile**: `prod`
 - **Resources**: 2-4GB RAM, 1-2 CPU cores
 
-### Oracle Database (Production)
-- **Container**: `oracle-db-prod`
-- **Ports**: 1521 (database), 5500 (EM)
-- **Image**: `container-registry.oracle.com/database/express:21.3.0-xe`
-- **Resources**: 1-2GB RAM, 0.5-1 CPU cores
+### External Oracle Database
+- **Host**: `infdev-ora01a.tcmis.com`
+- **Port**: 1521
+- **Service**: `ICSDEV`
+- **Connection**: External database managed separately
+
+### Monitoring Stack
+- **Prometheus**: Metrics collection with 720h retention (port 9092)
+  - Resources: 1GB memory limit, 0.5 CPU cores
+- **Loki**: Log aggregation with 720h retention (port 3100)
+  - Resources: 512MB memory limit, 0.25 CPU cores
+- **Promtail**: Log collection agent
+- **Grafana**: Visualization and dashboards (port 3000)
+  - Resources: 512MB memory limit, 0.25 CPU cores
+  - Credentials: Set via GRAFANA_ADMIN_PASSWORD environment variable
 
 ## Production Deployment Checklist
 
@@ -119,6 +137,12 @@ curl https://your-domain.com:9091/actuator/health/readiness
 
 # Application metrics
 curl https://your-domain.com:9091/actuator/metrics
+curl https://your-domain.com:9091/actuator/prometheus  # Prometheus format
+
+# Monitoring stack health
+curl https://your-domain.com:9092/-/healthy  # Prometheus
+curl https://your-domain.com:3100/ready     # Loki
+curl https://your-domain.com:3000/api/health # Grafana
 ```
 
 ### Backup Operations:

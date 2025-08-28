@@ -63,6 +63,7 @@ deploy_services() {
     cp environments/${ENVIRONMENT}/docker-compose.yml .
     cp environments/${ENVIRONMENT}/.env.example .env
     cp environments/${ENVIRONMENT}/docker-login.sh .
+    cp -r environments/${ENVIRONMENT}/monitoring .
     
     echo "Logging into Azure Container Registry..."
     chmod +x docker-login.sh
@@ -79,6 +80,13 @@ deploy_services() {
     
     check_service_health "ics-service-liveness" "http://localhost:9091/actuator/health/liveness"
     check_service_health "ics-service-readiness" "http://localhost:9091/actuator/health/readiness"
+    
+    echo "Waiting for monitoring services to be ready..."
+    sleep 30  # Additional delay for monitoring stack
+    
+    check_service_health "prometheus" "http://localhost:9092/-/healthy"
+    check_service_health "loki" "http://localhost:3100/ready"
+    check_service_health "grafana" "http://localhost:3000/api/health"
     
     echo "Deployment completed successfully!"
 }

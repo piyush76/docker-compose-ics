@@ -1,6 +1,6 @@
 # Development Environment
 
-This directory contains the development environment configuration for the ICS Service.
+This directory contains the development environment configuration for the ICS Service with integrated monitoring stack.
 
 ## Quick Start
 
@@ -12,7 +12,10 @@ cd environments/dev
 cp .env.example .env
 # Edit .env with your development values
 
-# Start services
+# Login to Azure Container Registry
+./docker-login.sh
+
+# Start services (including monitoring stack)
 docker-compose up -d
 # OR with podman
 podman-compose up -d
@@ -21,6 +24,11 @@ podman-compose up -d
 docker-compose ps
 # OR with podman
 podman-compose ps
+
+# Access monitoring services
+# Grafana: http://localhost:3000 (admin/admin123)
+# Prometheus: http://localhost:9092
+# Loki: http://localhost:3100
 ```
 
 ## Development Features
@@ -55,6 +63,14 @@ podman-compose ps
 - **Service**: `ICSDEV`
 - **Connection**: External database managed separately
 
+### Monitoring Stack
+- **Prometheus**: Metrics collection and storage (port 9092)
+- **Loki**: Log aggregation and storage (port 3100)
+- **Promtail**: Log collection agent
+- **Grafana**: Visualization and dashboards (port 3000)
+  - Default credentials: admin/admin123
+  - Pre-configured datasources: Prometheus and Loki
+
 ## Development Workflow
 
 ### Starting Development Environment:
@@ -81,6 +97,11 @@ curl http://localhost:9091/actuator/health/readiness
 
 # Application endpoints
 curl http://localhost:9090/chemicals/api/actuator/info
+
+# Monitoring endpoints
+curl http://localhost:9091/actuator/prometheus  # Prometheus metrics
+curl http://localhost:9092/api/v1/query?query=up  # Prometheus query
+curl http://localhost:3100/ready  # Loki readiness
 
 # External database connection test (if you have access)
 # sqlplus tcm_ops/devpassword123@//infdev-ora01a.tcmis.com:1521/ICSDEV

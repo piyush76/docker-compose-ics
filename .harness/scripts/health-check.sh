@@ -55,6 +55,32 @@ check_external_database_connectivity() {
     return 1
 }
 
+check_monitoring_services() {
+    local all_healthy=true
+    
+    echo "🔍 Checking monitoring services health..."
+    
+    if ! check_http_endpoint "http://$TARGET_HOST:9092/-/healthy" "prometheus"; then
+        all_healthy=false
+    fi
+    
+    if ! check_http_endpoint "http://$TARGET_HOST:3100/ready" "loki"; then
+        all_healthy=false
+    fi
+    
+    if ! check_http_endpoint "http://$TARGET_HOST:3000/api/health" "grafana"; then
+        all_healthy=false
+    fi
+    
+    if [ "$all_healthy" = true ]; then
+        echo "🎉 All monitoring services are healthy!"
+        return 0
+    else
+        echo "💥 One or more monitoring services failed health checks"
+        return 1
+    fi
+}
+
 check_all_services() {
     local all_healthy=true
     
@@ -73,6 +99,10 @@ check_all_services() {
     fi
     
     if ! check_http_endpoint "http://$TARGET_HOST:9090/chemicals/api/actuator/health" "ics-service-application"; then
+        all_healthy=false
+    fi
+    
+    if ! check_monitoring_services; then
         all_healthy=false
     fi
     
@@ -98,6 +128,18 @@ case "$SERVICE_NAME" in
         ;;
     "readiness")
         check_http_endpoint "http://$TARGET_HOST:9091/actuator/health/readiness" "ics-service-readiness"
+        ;;
+    "monitoring"|"prometheus"|"loki"|"grafana")
+        check_monitoring_services
+        ;;
+    "prometheus-only")
+        check_http_endpoint "http://$TARGET_HOST:9092/-/healthy" "prometheus"
+        ;;
+    "loki-only")
+        check_http_endpoint "http://$TARGET_HOST:3100/ready" "loki"
+        ;;
+    "grafana-only")
+        check_http_endpoint "http://$TARGET_HOST:3000/api/health" "grafana"
         ;;
     "all"|*)
         check_all_services
