@@ -85,8 +85,10 @@ deploy_services() {
     sleep 30  # Additional delay for monitoring stack
     
     check_service_health "prometheus" "http://localhost:9092/-/healthy"
+    check_service_health "alertmanager" "http://localhost:9093/-/healthy"
     check_service_health "loki" "http://localhost:3100/ready"
     check_service_health "grafana" "http://localhost:3000/api/health"
+    check_service_health "jaeger" "http://localhost:16686/api/services"
     
     echo "Deployment completed successfully!"
 }

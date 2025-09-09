@@ -72,6 +72,14 @@ check_monitoring_services() {
         all_healthy=false
     fi
     
+    if ! check_http_endpoint "http://$TARGET_HOST:9093/-/healthy" "alertmanager"; then
+        all_healthy=false
+    fi
+    
+    if ! check_http_endpoint "http://$TARGET_HOST:16686/api/services" "jaeger"; then
+        all_healthy=false
+    fi
+    
     if [ "$all_healthy" = true ]; then
         echo "🎉 All monitoring services are healthy!"
         return 0

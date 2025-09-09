@@ -63,13 +63,52 @@ podman-compose ps
 - **Service**: `ICSDEV`
 - **Connection**: External database managed separately
 
-### Monitoring Stack
-- **Prometheus**: Metrics collection and storage (port 9092)
-- **Loki**: Log aggregation and storage (port 3100)
-- **Promtail**: Log collection agent
-- **Grafana**: Visualization and dashboards (port 3000)
-  - Default credentials: admin/admin123
-  - Pre-configured datasources: Prometheus and Loki
+## Monitoring Services
+
+The development environment includes a comprehensive observability stack:
+
+- **Prometheus** (port 9092): Metrics collection and alerting
+- **Alertmanager** (port 9093): Alert routing and notifications
+- **Loki** (port 3100): Log aggregation
+- **Promtail**: Log shipping to Loki
+- **Grafana** (port 3000): Visualization and dashboards
+- **Jaeger** (port 16686): Distributed tracing
+  - Username: `admin`
+  - Password: `admin123`
+
+### Monitoring URLs
+
+- Grafana: http://localhost:3000
+- Prometheus: http://localhost:9092
+- Alertmanager: http://localhost:9093
+- Loki: http://localhost:3100
+- Jaeger UI: http://localhost:16686
+
+### Available Dashboards
+
+- **ICS Service Health**: API metrics, error rates, response times, infrastructure metrics
+- **ICS Business KPIs**: Receipt processing, user operations, safety data sheet retrievals
+
+### Alerting
+
+The monitoring stack includes comprehensive alerting rules:
+- High error rates (>5% for 5 minutes)
+- Service downtime
+- High response times (p99 > 2s for 10 minutes)
+- Database connection failures
+- High memory usage (>90% for 10 minutes)
+- Business-specific alerts for receipt processing and authentication
+
+### Chaos Testing
+
+Use the provided chaos testing scripts to validate monitoring:
+```bash
+cd monitoring/chaos-tests/
+./validate-monitoring.sh          # Full monitoring stack validation
+./simulate-high-load.sh 5 10      # Simulate high load for 5 minutes
+./simulate-database-failure.sh 3  # Simulate DB issues for 3 minutes
+./simulate-memory-pressure.sh 5   # Simulate memory pressure for 5 minutes
+```
 
 ## Development Workflow
 

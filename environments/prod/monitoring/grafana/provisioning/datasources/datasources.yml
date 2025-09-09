@@ -5,12 +5,12 @@ datasources:
   - name: Prometheus
     type: prometheus
     access: proxy
-    url: http://prometheus-prod:9090
+    url: http://prometheus-dev:9090
     isDefault: true
     editable: true
 
   - name: Loki
     type: loki
     access: proxy
-    url: http://loki-prod:3100
+    url: http://loki-dev:3100
     editable: true

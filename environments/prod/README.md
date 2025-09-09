@@ -70,15 +70,58 @@ curl https://your-domain.com:9091/actuator/health
 - **Service**: `ICSDEV`
 - **Connection**: External database managed separately
 
-### Monitoring Stack
-- **Prometheus**: Metrics collection with 720h retention (port 9092)
-  - Resources: 1GB memory limit, 0.5 CPU cores
-- **Loki**: Log aggregation with 720h retention (port 3100)
-  - Resources: 512MB memory limit, 0.25 CPU cores
-- **Promtail**: Log collection agent
-- **Grafana**: Visualization and dashboards (port 3000)
-  - Resources: 512MB memory limit, 0.25 CPU cores
-  - Credentials: Set via GRAFANA_ADMIN_PASSWORD environment variable
+## Monitoring Services
+
+The production environment includes a comprehensive observability stack with enhanced security:
+
+- **Prometheus** (port 9092): Metrics collection and alerting
+- **Alertmanager** (port 9093): Alert routing and notifications with PagerDuty integration
+- **Loki** (port 3100): Log aggregation
+- **Promtail**: Log shipping to Loki
+- **Grafana** (port 3000): Visualization and dashboards
+- **Jaeger** (port 16686): Distributed tracing
+  - Username: `admin`
+  - Password: Set via `GRAFANA_ADMIN_PASSWORD` environment variable
+
+### Monitoring URLs
+
+- Grafana: http://localhost:3000
+- Prometheus: http://localhost:9092
+- Alertmanager: http://localhost:9093
+- Loki: http://localhost:3100
+- Jaeger UI: http://localhost:16686
+
+### Available Dashboards
+
+- **ICS Service Health - Production**: API metrics, error rates, response times, infrastructure metrics
+- **ICS Business KPIs - Production**: Receipt processing, user operations, safety data sheet retrievals
+
+### Production Alerting
+
+Enhanced alerting configuration for production:
+- **Critical alerts**: PagerDuty, Slack, Email notifications
+- **Warning alerts**: Slack and Email notifications
+- **Alert grouping**: Intelligent grouping to reduce noise
+- **Escalation**: Automatic escalation for unresolved critical alerts
+
+### Alert Channels Configuration
+
+Set the following environment variables for alert notifications:
+```bash
+SLACK_WEBHOOK_URL=https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK
+SMTP_HOST=smtp.yourcompany.com:587
+SMTP_USERNAME=alerts@yourcompany.com
+SMTP_PASSWORD=your-smtp-password
+ALERT_EMAIL_TO=admin@yourcompany.com
+PAGERDUTY_INTEGRATION_KEY=your-pagerduty-key
+```
+
+### Security Features
+
+- Container security hardening (no-new-privileges, capability drops)
+- Resource limits and reservations
+- Secure credential management via environment variables
+- Network isolation
 
 ## Production Deployment Checklist
 

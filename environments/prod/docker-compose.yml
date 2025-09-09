@@ -32,6 +32,15 @@ services:
       # Production specific settings
       - LOGGING_LEVEL_ROOT=WARN
       - LOGGING_LEVEL_COM_INCORA=INFO
+      # OpenTelemetry configuration
+      - OTEL_SERVICE_NAME=ics-service
+      - OTEL_TRACES_EXPORTER=otlp
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger-prod:14268/api/traces
+      - OTEL_RESOURCE_ATTRIBUTES=service.name=ics-service,service.version=stable,environment=prod
+      # Enhanced logging with trace correlation
+      - >-
+        LOGGING_PATTERN_CONSOLE=%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level
+        [%X{traceId},%X{spanId}] %logger{36} - %msg%n
       # Performance tuning
       - JAVA_OPTS=-Xms2g -Xmx4g -XX:+UseG1GC
     volumes:
@@ -71,6 +80,7 @@ services:
       - "9092:9090"  # Prometheus web UI
     volumes:
       - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./monitoring/alert-rules.yml:/etc/prometheus/alert-rules.yml
       - prometheus-data-prod:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
@@ -79,6 +89,7 @@ services:
       - '--web.console.templates=/etc/prometheus/consoles'
       - '--storage.tsdb.retention.time=720h'
       - '--web.enable-lifecycle'
+      - '--web.enable-admin-api'
     restart: always
     security_opt:
       - no-new-privileges:true
@@ -165,6 +176,61 @@ services:
     networks:
       - ics-network-prod
 
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: alertmanager-prod
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./monitoring/alertmanager.yml:/etc/alertmanager/alertmanager.yml
+      - alertmanager-data-prod:/alertmanager
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+      - '--web.external-url=http://localhost:9093'
+    restart: always
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.5'
+        reservations:
+          memory: 128M
+          cpus: '0.25'
+    networks:
+      - ics-network-prod
+
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: jaeger-prod
+    ports:
+      - "16686:16686"  # Jaeger UI
+      - "14268:14268"  # HTTP collector
+      - "14250:14250"  # gRPC collector
+      - "6831:6831/udp"  # UDP agent
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+      - SPAN_STORAGE_TYPE=memory
+    restart: always
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '1.0'
+        reservations:
+          memory: 256M
+          cpus: '0.5'
+    networks:
+      - ics-network-prod
+
 volumes:
   # Named volumes for persistent data storage - Production
   ics-service-msds-prod:
@@ -179,6 +245,8 @@ volumes:
   loki-data-prod:
     driver: local
   grafana-data-prod:
+    driver: local
+  alertmanager-data-prod:
     driver: local
 
 networks:
