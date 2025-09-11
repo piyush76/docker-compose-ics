@@ -1,0 +1,185 @@
+---
+services:
+  ics-service:
+    image: incora.azurecr.io/ics-service:latest
+    container_name: ics-service-dkrc01
+    # Azure Container Registry authentication
+    pull_policy: always
+    ports:
+      - "9090:9090"  # Application port
+      - "9091:9091"  # Management/Actuator port
+    environment:
+      # Database configuration - External Oracle Database
+      - DB_URL=jdbc:oracle:thin:@//infdev-ora01a.tcmis.com:1521/ICSDEV
+      - DB_PASSWORD=${TCMIS_DB_SECRET:-devpassword}
+      # Spring configuration
+      - SPRING_PROFILES_ACTIVE=dev
+      - SPRING_DATASOURCE_URL=jdbc:oracle:thin:@//infdev-ora01a.tcmis.com:1521/ICSDEV
+      - SPRING_DATASOURCE_USERNAME=tcm_ops
+      - SPRING_DATASOURCE_PASSWORD=${TCMIS_DB_SECRET:-devpassword}
+      - SPRING_DATASOURCE_DRIVER_CLASS_NAME=oracle.jdbc.OracleDriver
+      # Azure AD configuration
+      - SPRING_CLOUD_AZURE_ACTIVE_DIRECTORY_ENABLED=true
+      - SPRING_CLOUD_AZURE_ACTIVE_DIRECTORY_CREDENTIAL_CLIENT_ID=a390d735-8347-4ef1-8a65-875d1410e88c
+      - SPRING_CLOUD_AZURE_ACTIVE_DIRECTORY_APP_ID_URI=api://a390d735-8347-4ef1-8a65-875d1410e88c
+      # Server configuration
+      - SERVER_PORT=9090
+      - SERVER_SERVLET_CONTEXT_PATH=/chemicals/api
+      - MANAGEMENT_SERVER_PORT=9091
+      - MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=*
+      - MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always
+      - MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED=true
+      # Server identification
+      - LOGGING_LEVEL_ROOT=INFO
+      - LOGGING_LEVEL_COM_INCORA=INFO
+      - SERVER_INSTANCE_ID=icsdev-dkrc-01.incora.global
+      # OpenTelemetry configuration
+      - OTEL_SERVICE_NAME=ics-service-dkrc01
+      - OTEL_TRACES_EXPORTER=otlp
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger-dkrc01:14268/api/traces
+      - >-
+        OTEL_RESOURCE_ATTRIBUTES=service.name=ics-service,service.version=latest,
+        environment=dev,server=icsdev-dkrc-01.incora.global
+      # Enhanced logging with trace correlation
+      - >-
+        LOGGING_PATTERN_CONSOLE=%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level
+        [%X{traceId},%X{spanId}] %logger{36} - %msg%n
+    volumes:
+      - ics-service-msds-dkrc01:/msds
+      - ics-service-receiptimages-dkrc01:/receiptimages
+      - ics-service-docimages-dkrc01:/docimages
+    healthcheck:
+      test: ["CMD", "curl", "-f",
+             "http://localhost:9091/actuator/health/liveness"]
+      interval: 5s
+      timeout: 1s
+      retries: 3
+      start_period: 45s
+    # No local database dependency - using external Oracle database
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    networks:
+      - ics-network-dkrc01
+
+  # Monitoring Stack for DKRC01
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus-dkrc01
+    ports:
+      - "9092:9090"  # Prometheus web UI
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./monitoring/alert-rules.yml:/etc/prometheus/alert-rules.yml
+      - prometheus-data-dkrc01:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+      - '--web.enable-admin-api'
+      - '--web.external-url=http://icsdev-dkrc-01.incora.global:9092'
+    restart: unless-stopped
+    networks:
+      - ics-network-dkrc01
+
+  loki:
+    image: grafana/loki:latest
+    container_name: loki-dkrc01
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./monitoring/loki-config.yml:/etc/loki/local-config.yaml
+      - loki-data-dkrc01:/loki
+    command: -config.file=/etc/loki/local-config.yaml
+    restart: unless-stopped
+    networks:
+      - ics-network-dkrc01
+
+  promtail:
+    image: grafana/promtail:latest
+    container_name: promtail-dkrc01
+    volumes:
+      - ./monitoring/promtail-config.yml:/etc/promtail/config.yml
+      - /var/log:/var/log:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    command: -config.file=/etc/promtail/config.yml
+    restart: unless-stopped
+    networks:
+      - ics-network-dkrc01
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana-dkrc01
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana-data-dkrc01:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin123}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SERVER_ROOT_URL=http://icsdev-dkrc-01.incora.global:3000
+      - GF_INSTALL_PLUGINS=grafana-piechart-panel
+    restart: unless-stopped
+    networks:
+      - ics-network-dkrc01
+
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: alertmanager-dkrc01
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./monitoring/alertmanager.yml:/etc/alertmanager/alertmanager.yml
+      - alertmanager-data-dkrc01:/alertmanager
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+      - '--web.external-url=http://icsdev-dkrc-01.incora.global:9093'
+    restart: unless-stopped
+    networks:
+      - ics-network-dkrc01
+
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: jaeger-dkrc01
+    ports:
+      - "16686:16686"  # Jaeger UI
+      - "14268:14268"  # HTTP collector
+      - "14250:14250"  # gRPC collector
+      - "6831:6831/udp"  # UDP agent
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+      - SPAN_STORAGE_TYPE=memory
+    restart: unless-stopped
+    networks:
+      - ics-network-dkrc01
+
+volumes:
+  # Named volumes for persistent data storage - DKRC01
+  ics-service-msds-dkrc01:
+    driver: local
+  ics-service-receiptimages-dkrc01:
+    driver: local
+  ics-service-docimages-dkrc01:
+    driver: local
+  # Monitoring volumes - DKRC01
+  prometheus-data-dkrc01:
+    driver: local
+  loki-data-dkrc01:
+    driver: local
+  grafana-data-dkrc01:
+    driver: local
+  alertmanager-data-dkrc01:
+    driver: local
+
+networks:
+  ics-network-dkrc01:
+    driver: bridge
+    name: ics-network-dkrc01

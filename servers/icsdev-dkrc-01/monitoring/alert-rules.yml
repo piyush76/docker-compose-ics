@@ -1,0 +1,166 @@
+---
+groups:
+  - name: ics-service-alerts
+    rules:
+      - alert: HighErrorRate
+        expr: >-
+          rate(http_server_requests_seconds_count{job="ics-service",
+          status=~"5.."}[5m]) /
+          rate(http_server_requests_seconds_count{job="ics-service"}[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High error rate detected for ICS Service"
+          description: >-
+            Error rate is {{ $value | humanizePercentage }} for the last 5 min
+
+      - alert: HighLatency
+        expr: >-
+          histogram_quantile(0.99,
+          rate(http_server_requests_seconds_bucket{job="ics-service"}[5m])) > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High latency detected for ICS Service"
+          description: >-
+            99th percentile latency is {{ $value }}s for the last 5 minutes
+
+      - alert: ServiceDown
+        expr: up{job="ics-service"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "ICS Service is down"
+          description: "ICS Service has been down for more than 1 minute"
+
+      - alert: HighMemoryUsage
+        expr: >-
+          jvm_memory_used_bytes{job="ics-service",area="heap"} /
+          jvm_memory_max_bytes{job="ics-service",area="heap"} > 0.8
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage for ICS Service"
+          description: >-
+            Memory usage is {{ $value | humanizePercentage }} for the last 5 min
+
+      - alert: DatabaseConnectionFailure
+        expr: increase(ics_database_connection_failures_total[5m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Database connection failures detected"
+          description: >-
+            {{ $value }} database connection failures in the last 5 minutes
+
+      - alert: LowCaseProcessingSuccessRate
+        expr: >-
+          (increase(ics_case_processing_total{status="success"}[1h]) /
+          increase(ics_case_processing_total[1h])) < 0.95
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Low case processing success rate"
+          description: >-
+            Case processing success rate is {{ $value | humanizePercentage }}
+
+  - name: infrastructure-alerts
+    rules:
+      - alert: ContainerRestarted
+        expr: >-
+          increase(kube_pod_container_status_restarts_total{pod=~"ics-service.*"}[1h])
+          > 0
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container has been restarted"
+          description: >-
+            Container {{ $labels.container }} in pod {{ $labels.pod }} has been
+            restarted {{ $value }} times in the last hour
+
+      - alert: HighCPUUsage
+        expr: process_cpu_usage{job="ics-service"} > 0.8
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage for ICS Service"
+          description: >-
+            CPU usage is {{ $value | humanizePercentage }} for the last 5 min
+
+  - name: loki-log-alerts
+    rules:
+      - alert: HighErrorLogRate
+        expr: rate({job="ics-service"} |= "ERROR" [5m]) > 0.1
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High error log rate detected"
+          description: >-
+            Error log rate is {{ $value }} logs per second for the last 5 min
+
+      - alert: OutOfMemoryError
+        expr: rate({job="ics-service"} |= "OutOfMemoryError" [1m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: "OutOfMemoryError detected in logs"
+          description: "OutOfMemoryError found in application logs"
+
+      - alert: DatabaseConnectionError
+        expr: rate({job="ics-service"} |= "DB connection failed" [1m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Database connection error detected in logs"
+          description: "Database connection failures found in application logs"
+
+      # Receipt processing failure
+      - alert: ReceiptProcessingFailure
+        expr: >-
+          rate(http_server_requests_seconds_count{job="ics-service",
+          uri="/logistics/receipts/process/quality/assign",status=~"5.."}[5m])
+          > 0.01
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High failure rate in receipt processing"
+          description: >-
+            Receipt assignment endpoint failing at {{ $value }} requests per sec
+
+      # User authentication issues
+      - alert: UserAuthenticationIssues
+        expr: >-
+          rate(http_server_requests_seconds_count{job="ics-service",
+          uri=~"/iam/.*",status="401"}[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High authentication failure rate"
+          description: >-
+            IAM endpoints experiencing {{ $value }} auth failures per sec
+
+      # Safety Data Sheets retrieval issues
+      - alert: SafetyDataSheetsFailure
+        expr: >-
+          rate(http_server_requests_seconds_count{job="ics-service",
+          uri=~"/catalog/item/.*/safetydatasheets",status=~"5.."}[5m]) > 0.02
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High failure rate in safety data sheets retrieval"
+          description: >-
+            Safety data sheets endpoint failing at {{ $value }} requests per sec
